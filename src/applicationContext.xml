@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.3.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.3.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.3.xsd">
+
+
+<!-- 配置自动扫描的包 -->	
+	<context:component-scan base-package="account"></context:component-scan>	
+		
+	<!-- 导入资源文件 -->
+	<context:property-placeholder location="classpath:db.properties" />
+
+
+	<!-- 配置c3p0数据源 -->
+	<bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+		<property name="driverClass" value="${jdbc.driverClass}"></property>
+		<property name="jdbcUrl" value="${jdbc.url}"></property>
+		<property name="user" value="${jdbc.user}"></property>
+		<property name="password" value="${jdbc.password}"></property>
+
+
+		<property name="initialPoolSize" value="${jdbc.initPoolSize}"></property>
+		<property name="maxPoolSize" value="${jdbc.maxPoolSize}"></property>
+
+	</bean>
+
+
+
+	<!-- 配置Hibernate的sessionfactory的实例,通过spring提供的localsessionFactorybean进行配置 -->
+	<bean id="sessionFactory" class="org.springframework.orm.hibernate4.LocalSessionFactoryBean">
+			<!-- 配置数据源属性 -->
+			<property name="dataSource" ref="dataSource"></property>
+			
+			<!-- 配置hibernate.cfg.xml配置文件 classpath： 表示类路径下 -->	
+			<property name="configLocation" value="classpath:hibernate.cfg.xml"></property>
+			
+			<!-- 配置映射文件 hbm.xml文件,注意包名中的点用斜杠表示，*表示多个hbm.xml文件，表示通配符 -->
+			<property name="mappingLocations" value="classpath:account/*.hbm.xml"></property>
+	</bean>
+	
+	<!-- 以下是配置spring的声明式事物 -->
+	<!-- 1.配置事物管理器 -->
+	<bean id="transactionManager" class="org.springframework.orm.hibernate4.HibernateTransactionManager">
+			<property name="sessionFactory" ref="sessionFactory"></property>
+	</bean>
+	
+	<!-- 2.配置事物属性，需事物管理器 -->
+	<tx:advice id="txAdvice" transaction-manager="transactionManager">
+			<tx:attributes>
+		
+			<!-- 方法以get开头的不使用事物 -->
+			<tx:method name="get*" read-only="true" propagation="NOT_SUPPORTED"/>
+			
+			<!-- 其他方法以默认事物进行 -->
+			<tx:method name="*"/>
+				
+			</tx:attributes>
+	</tx:advice>
+	
+	<!-- 3. 配置aop的切面 ，并把切点和事物属性关联起来 -->
+		<aop:config>
+		<aop:pointcut expression="execution(* account.*.*(..))" id="txPoint"/>
+		
+		<aop:advisor advice-ref="txAdvice" pointcut-ref="txPoint"/><!-- 表示在txPoint切入点配置txAdvice增强 -->
+		</aop:config>
+	
+	<!-- 配置注解驱动 -->
+	<tx:annotation-driven transaction-manager="transactionManager"/>
+
+
+</beans>
